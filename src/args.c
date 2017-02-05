@@ -3,12 +3,12 @@
 #include <string.h>
 #include <limits.h>
 #include <glob.h>
+
 #include "args.h"
 
-void parse_args(int argc, char **argv, struct file_list_t *file_list) {
+int parse_args(int argc, char **argv, struct file_list_t *file_list) {
     if (argc <= 1) {
-        fprintf(stderr, "Missing file argument\n");
-        exit(1);
+        return 0;
     }
 
     int flags = 0;
@@ -29,4 +29,6 @@ void parse_args(int argc, char **argv, struct file_list_t *file_list) {
 
     file_list->file_count = globbuf.gl_pathc;
     file_list->files = filebuf;
+
+    return 1;
 }
