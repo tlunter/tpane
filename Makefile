@@ -3,11 +3,15 @@ exe := tpane
 
 all: $(exe)
 
+clean:
+	rm -r obj
+	rm tpane
+
 $(exe): $(objects)
-	gcc -I inc -o $(exe) $(objects)
+	gcc -I inc -Wall -o $(exe) $(objects)
 
 obj/%.o: src/%.c
 	mkdir -p obj
-	gcc -I inc -c -o $@ $<
+	gcc -I inc -Wall -c -o $@ $<
 
-.PHONY: all
+.PHONY: all clean
