@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/ioctl.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "args.h"
@@ -9,47 +9,47 @@
 
 int main(int argc, char **argv) {
     struct file_list_t file_list;
+    struct watched_files_t watched_files;
 
     int parsed = parse_args(argc, argv, &file_list);
     if (!parsed) {
         fprintf(stderr, "Missing file argument\n");
-        exit(1);
+        return 1;
     }
 
-    terminal_setup();
-
-    for (int i = 0; i < file_list.file_count; i++) {
-        fprintf(stderr, "File: %s\r\n", file_list.files[i]);
-    }
-    if (file_list.file_count > 0) {
-        fprintf(stderr, "\r\n");
-    }
-
-    if (!files_setup(&file_list)) {
-        terminal_reset();
-
+    if (!files_setup(&watched_files, &file_list)) {
         fprintf(stderr, "Failed to read files\n");
         return 1;
     }
 
-    struct winsize w;
+    terminal_setup();
+
     unsigned char buff [100];
+    struct timeval last_run = {0};
+    struct timeval now;
+    struct timeval diff;
+
+    struct watched_files_t recent_files;
+    files_alloc(&recent_files, watched_files.file_count);
 
     while (1) {
-        ioctl(0, TIOCGWINSZ, &w);
-        //printf("Lines %d\r\n", w.ws_row);
-        //printf("Columns %d\r\n", w.ws_col);
+        gettimeofday(&now, NULL);
+        timersub(&now, &last_run, &diff);
+        files_update(&watched_files);
 
-        files_update();
-        files_print_lines();
+        if (diff.tv_sec > 0 || diff.tv_usec > 500000) {
+
+            terminal_reset_cursor();
+            files_get_recent(&watched_files, &recent_files);
+            terminal_draw_files(&recent_files);
+
+            last_run = now;
+        }
 
         int characters = terminal_has_input(buff, 100);
         if (characters) {
             if (buff[0] == 3) {
-                terminal_reset();
-
-                fprintf(stderr, "Dying\n");
-                return 0;
+                break;
             }
         }
     }

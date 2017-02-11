@@ -9,15 +9,18 @@
 #include "args.h"
 #include "files.h"
 
-int file_count;
-struct watched_file_t *files;
+#define MAX_MODIFIED_TIME 300
 
 struct line_t *line_alloc(char *payload, int length) {
     char *data = (char*)malloc(length + 1);
     strncpy(data, payload, length);
+    data[length + 1] = '0';
 
     struct line_t *line = (struct line_t*)malloc(sizeof(struct line_t));
+    line->length = length;
     line->data = data;
+    line->next_line = NULL;
+    line->prior_line = NULL;
 
     return line;
 }
@@ -27,31 +30,46 @@ void line_dealloc(struct line_t *line) {
     free(line);
 }
 
-int files_setup(struct file_list_t *file_list) {
-    file_count = file_list->file_count;
-    files = (struct watched_file_t*)malloc(file_list->file_count * sizeof(struct watched_file_t));
+void files_alloc(struct watched_files_t *watched_files, int file_count) {
+    watched_files->file_count = file_count;
+    watched_files->files = (struct watched_file_t*)malloc(file_count * sizeof(struct watched_file_t));
+}
+
+int files_setup(struct watched_files_t *watched_files, struct file_list_t *file_list) {
+    files_alloc(watched_files, file_list->file_count);
 
     for (int i = 0; i < file_list->file_count; i++) {
         int n = strlen(file_list->files[i]) + 1;
-        files[i].file_name = (char*)malloc(n);
-        strcpy(files[i].file_name, file_list->files[i]);
+        watched_files->files[i].file_name = (char*)malloc(n);
+        strcpy(watched_files->files[i].file_name, file_list->files[i]);
 
         int fd = open(file_list->files[i], O_RDONLY | O_NONBLOCK);
         if (fd < 0) {
             return 0;
         }
 
-        files[i].fd = fd;
+        watched_files->files[i].fd = fd;
     }
 
     return 1;
 }
 
-int files_modified_time(char *file_name) {
-    struct stat attrib;
-    stat(file_name, &attrib);
+int files_update_stat(struct watched_file_t *file) {
+    int retval;
 
-    return attrib.st_mtim.tv_sec;
+    struct stat attrib;
+    stat(file->file_name, &attrib);
+
+    file->modified_time = attrib.st_mtim.tv_sec;
+
+    if (attrib.st_ino != file->inode && file->inode != 0) {
+        retval = 1;
+    } else {
+        retval = 0;
+    }
+    file->inode = attrib.st_ino;
+
+    return retval;
 }
 
 void files_read_lines(struct watched_file_t *file) {
@@ -77,10 +95,15 @@ void files_read_lines(struct watched_file_t *file) {
                     if (file->line_count >= 100) {
                         line_dealloc(file->first_line);
                         file->first_line = file->first_line->next_line;
+                        file->first_line->prior_line = NULL;
                     } else {
                         file->line_count++;
                     }
-                    file->last_line = file->last_line->next_line = line;
+
+                    file->last_line->next_line = line;
+                    line->prior_line = file->last_line;
+
+                    file->last_line = line;
                 }
                 line_position = 0;
             } else {
@@ -90,22 +113,38 @@ void files_read_lines(struct watched_file_t *file) {
     } while (amount_read > 0);
 }
 
-void files_print_lines() {
-    for (int i = 0; i < file_count; i++) {
-        struct watched_file_t file = files[i];
-        struct line_t *line = file.first_line;
-        while (line != NULL) {
-            printf("%s\r\n", line->data);
-            line = line->next_line;
-        }
-    }
+void files_reopen_file(struct watched_file_t *file) {
+    file->fd = open(file->file_name, O_RDONLY | O_NONBLOCK);
+    lseek(file->fd, 0, SEEK_END);
 }
 
-int files_update() {
-    for (int i = 0; i < file_count; i++) {
-        files[i].modified_time = files_modified_time(files[i].file_name);
-        files_read_lines(files+i);
+int files_update(struct watched_files_t *watched_files) {
+    for (int i = 0; i < watched_files->file_count; i++) {
+        if (files_update_stat(watched_files->files + i)) {
+            files_reopen_file(watched_files->files + i);
+        }
+        files_read_lines(watched_files->files + i);
     }
 
     return 1;
+}
+
+void files_get_recent(struct watched_files_t *watched_files, struct watched_files_t *recent_files) {
+    int file_count = 0;
+    time_t now = time(0);
+
+    if (now < 0) {
+        return;
+    }
+
+    for (int i = 0; i < watched_files->file_count; i++) {
+        struct watched_file_t file = watched_files->files[i];
+
+        if ((now - file.modified_time) < MAX_MODIFIED_TIME) {
+            memcpy((recent_files->files + file_count), (watched_files->files + i), sizeof(struct watched_file_t));
+            file_count++;
+        }
+    }
+
+    recent_files->file_count = file_count;
 }

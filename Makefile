@@ -1,17 +1,18 @@
 objects := $(patsubst src/%.c,obj/%.o,$(wildcard src/*.c))
 exe := tpane
+flags := -I inc -Wall -lm -g
 
 all: $(exe)
 
 clean:
-	rm -r obj
-	rm tpane
+	rm -rf obj
+	rm -f tpane
 
 $(exe): $(objects)
-	gcc -I inc -Wall -o $(exe) $(objects)
+	gcc $(flags) -o $(exe) $(objects)
 
 obj/%.o: src/%.c
 	mkdir -p obj
-	gcc -I inc -Wall -c -o $@ $<
+	gcc $(flags) -c -o $@ $<
 
 .PHONY: all clean
