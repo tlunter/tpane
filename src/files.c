@@ -60,7 +60,7 @@ int files_update_stat(struct watched_file_t *file) {
     struct stat attrib;
     stat(file->file_name, &attrib);
 
-    file->modified_time = attrib.st_mtim.tv_sec;
+    file->modified_time = attrib.st_mtime;
 
     if (attrib.st_ino != file->inode && file->inode != 0) {
         retval = 1;
