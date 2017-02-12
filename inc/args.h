@@ -1,5 +1,5 @@
 #ifndef __ARGS_H__
-#define __ARGS_H_
+#define __ARGS_H__
 
 struct file_list_t {
     int file_count;
