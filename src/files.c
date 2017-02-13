@@ -98,10 +98,10 @@ int files_update_stat(struct watched_file_t *file) {
 
 void files_read_lines(struct watched_file_t *file) {
     int line_position;
-    char line_buffer[8196];
+    char line_buffer[8196] = {0};
 
     int amount_read;
-    char read_buffer[8196];
+    char read_buffer[8196] = {0};
 
     do {
         line_position = 0;
