@@ -14,7 +14,7 @@
 struct line_t *line_alloc(char *payload, int length) {
     char *data = (char*)malloc(length + 1);
     strncpy(data, payload, length);
-    data[length + 1] = '0';
+    data[length] = '0';
 
     struct line_t *line = (struct line_t*)malloc(sizeof(struct line_t));
     line->length = length;
@@ -35,6 +35,10 @@ void files_alloc(struct watched_files_t *watched_files, int file_count) {
     watched_files->files = (struct watched_file_t*)malloc(file_count * sizeof(struct watched_file_t));
 }
 
+void files_free(struct watched_files_t *watched_files) {
+    free(watched_files->files);
+}
+
 int files_setup(struct watched_files_t *watched_files, struct file_list_t *file_list) {
     files_alloc(watched_files, file_list->file_count);
 
@@ -49,9 +53,29 @@ int files_setup(struct watched_files_t *watched_files, struct file_list_t *file_
         }
 
         watched_files->files[i].fd = fd;
+        watched_files->files[i].first_line = NULL;
+        watched_files->files[i].last_line = NULL;
+        watched_files->files[i].line_count = 0;
+        watched_files->files[i].inode = 0;
+        watched_files->files[i].modified_time = 0;
     }
 
     return 1;
+}
+
+void files_unsetup(struct watched_files_t *watched_files) {
+    for (int i = 0; i < watched_files->file_count; i++) {
+        struct watched_file_t file = watched_files->files[i];
+        struct line_t *line = file.first_line;
+        while (line != NULL) {
+            struct line_t *prior_line = line;
+            line = line->next_line;
+            line_dealloc(prior_line);
+        }
+
+        free(file.file_name);
+    }
+    free(watched_files->files);
 }
 
 int files_update_stat(struct watched_file_t *file) {
@@ -74,14 +98,14 @@ int files_update_stat(struct watched_file_t *file) {
 
 void files_read_lines(struct watched_file_t *file) {
     int line_position;
-    char line_buffer[1024];
+    char line_buffer[8196];
 
     int amount_read;
-    char read_buffer[1024];
+    char read_buffer[8196];
 
     do {
         line_position = 0;
-        amount_read = read(file->fd, read_buffer, 1024);
+        amount_read = read(file->fd, read_buffer, 8196);
 
         for (int i = 0; i < amount_read; i++) {
             if (read_buffer[i] == 10) {
@@ -93,8 +117,10 @@ void files_read_lines(struct watched_file_t *file) {
                     file->last_line = line;
                 } else {
                     if (file->line_count >= 100) {
-                        line_dealloc(file->first_line);
+                        struct line_t *first_line = file->first_line;
                         file->first_line = file->first_line->next_line;
+                        line_dealloc(first_line);
+
                         file->first_line->prior_line = NULL;
                     } else {
                         file->line_count++;

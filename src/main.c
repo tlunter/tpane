@@ -11,13 +11,15 @@ int main(int argc, char **argv) {
     struct file_list_t file_list;
     struct watched_files_t watched_files;
 
-    int parsed = parse_args(argc, argv, &file_list);
+    int parsed = args_parse(argc, argv, &file_list);
     if (!parsed) {
         fprintf(stderr, "Missing file argument\n");
         return 1;
     }
 
-    if (!files_setup(&watched_files, &file_list)) {
+    int setup = files_setup(&watched_files, &file_list);
+    args_free(&file_list);
+    if (!setup) {
         fprintf(stderr, "Failed to read files\n");
         return 1;
     }
@@ -55,6 +57,9 @@ int main(int argc, char **argv) {
     }
 
     terminal_reset();
+
+    files_free(&recent_files);
+    files_unsetup(&watched_files);
 
     return 0;
 }

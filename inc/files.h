@@ -26,7 +26,9 @@ struct watched_files_t {
 };
 
 void files_alloc(struct watched_files_t *watched_files, int file_count);
+void files_free(struct watched_files_t *watched_files);
 int files_setup(struct watched_files_t *watched_files, struct file_list_t *file_list);
+void files_unsetup(struct watched_files_t *watched_files);
 int files_update(struct watched_files_t *watched_files);
 void files_get_recent(struct watched_files_t *watched_files, struct watched_files_t *recent_files);
 

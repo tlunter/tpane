@@ -6,6 +6,7 @@ struct file_list_t {
     char **files;
 };
 
-int parse_args(int argc, char **argv, struct file_list_t *file_list);
+int args_parse(int argc, char **argv, struct file_list_t *file_list);
+void args_free(struct file_list_t *file_list);
 
 #endif

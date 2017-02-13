@@ -6,7 +6,7 @@
 
 #include "args.h"
 
-int parse_args(int argc, char **argv, struct file_list_t *file_list) {
+int args_parse(int argc, char **argv, struct file_list_t *file_list) {
     if (argc <= 1) {
         return 0;
     }
@@ -30,5 +30,14 @@ int parse_args(int argc, char **argv, struct file_list_t *file_list) {
     file_list->file_count = globbuf.gl_pathc;
     file_list->files = filebuf;
 
+    globfree(&globbuf);
+
     return 1;
+}
+
+void args_free(struct file_list_t *file_list) {
+    for (int i = 0; i < file_list->file_count; i++) {
+        free(file_list->files[i]);
+    }
+    free(file_list->files);
 }
